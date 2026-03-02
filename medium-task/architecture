@@ -1,0 +1,177 @@
+# Architecture Extension Plan  
+## Multivariate Support in imputeTestbench
+
+---
+
+## 1. Current Architecture Overview
+
+Currently, `imputeTestbench` primarily supports:
+
+- Univariate time series input
+- Missing data generation via `sample_dat()`
+- Imputation method comparison
+- Error evaluation using `impute_errors()`
+
+The workflow can be summarized as:
+
+Original Series  
+→ Missing Data Injection  
+→ Apply Imputation Methods  
+→ Compute Error Metrics  
+
+This workflow is designed around vector/ts input.
+
+---
+
+## 2. Proposed Multivariate Extension Strategy
+
+The goal is to extend the architecture to support:
+
+- Matrix / data.frame input
+- Column-wise multivariate processing
+- Structured missing data masks
+- Efficient evaluation across variables
+
+Without breaking existing functionality.
+
+---
+
+## 3. Extension Approach
+
+### 3.1 Input Handling Layer
+
+Modify `sample_dat()`:
+
+- Detect if input is:
+  - Vector / ts → use existing logic
+  - Matrix / data.frame → trigger multivariate logic
+
+Example logic:
+if (is.vector(data) || is.ts(data)) {
+# Existing behavior
+} else {
+# New multivariate pathway
+}
+
+This ensures backward compatibility.
+
+---
+
+### 3.2 Missingness Mask Layer
+
+Introduce an internal mask generator:
+
+- Logical matrix (n × p)
+- TRUE = missing
+- FALSE = observed
+
+The mask is applied before imputation.
+
+Advantages:
+- Decouples missing data simulation from imputation logic
+- Enables reusable mask generation
+- Supports future extensions (seasonal blocks, correlated dropouts)
+
+---
+
+### 3.3 Column-wise Imputation Layer
+
+For multivariate data:
+
+- Apply imputation methods column-wise
+- Preserve time alignment
+- Store results in matrix form
+
+Potential improvement:
+
+- Allow optional parallel evaluation across columns
+
+Example concept:
+apply(data, 2, function(col) {
+impute_method(col)
+})
+
+Parallelizable using `future.apply` or `parallel`.
+
+---
+
+## 4. Backward Compatibility Plan
+
+Backward compatibility is preserved by:
+
+- Keeping default behavior unchanged
+- Triggering multivariate logic only for matrix/data.frame input
+- Retaining original function signatures where possible
+- Making new arguments optional
+
+This ensures no breaking changes for CRAN users.
+
+---
+
+## 5. Performance Optimization Strategy
+
+### 5.1 Vectorization
+
+- Mask generation uses matrix operations
+- Avoid nested loops where possible
+
+### 5.2 Parallelization (Optional Extension)
+
+Add optional argument:
+parallel = FALSE
+
+If TRUE:
+- Use `future.apply` or `parallel::mclapply`
+- Distribute column-wise imputation
+
+This improves scalability for high-dimensional datasets.
+
+---
+
+## 6. Memory Efficiency Considerations
+
+- Modify matrices in-place when possible
+- Avoid redundant copies
+- Reuse mask objects
+
+For very large datasets:
+- Consider sparse mask representation (future enhancement)
+
+---
+
+## 7. Testing Strategy
+
+Add tests for:
+
+- Multivariate MCAR
+- Block missingness
+- Correlated missingness
+- Consistency with univariate behavior
+
+Edge cases:
+- Single-column matrix
+- All-missing column
+- Very small time series
+
+---
+
+## 8. Future Extension Opportunities
+
+- Seasonal missing blocks
+- Variable-dependent dropout probabilities
+- Cross-variable correlated block outages
+- Multivariate error metrics
+
+---
+
+## 9. Summary
+
+This architectural extension:
+
+- Preserves existing package design
+- Introduces structured multivariate support
+- Maintains CRAN compatibility
+- Improves scalability
+- Enables realistic missing data simulation
+
+The approach prioritizes modularity, extensibility, and performance.
